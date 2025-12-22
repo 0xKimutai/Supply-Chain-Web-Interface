@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import RegistrationRouter from './auth/RegistrationRouter';
 import Login from './auth/Login';
-import Dashboard from './components/Dashboard';
+import MainLayout from './components/MainLayout';
 
 // Protected Route Component
 interface ProtectedRouteProps {
@@ -32,7 +32,7 @@ function App() {
           path="/dashboard/*"
           element={
             <ProtectedRoute>
-              <Dashboard />
+              <MainLayout />
             </ProtectedRoute>
           }
         />
