@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
-import { Users } from 'lucide-react';
+import { Users, Wallet } from 'lucide-react';
 import { UserRole, type RegistrationData, roleConfigs } from './types';
+import { ethers, type Eip1193Provider } from 'ethers';
+
+declare global {
+  interface Window {
+    ethereum?: Eip1193Provider;
+  }
+}
 
 const RegistrationRouter: React.FC = () => {
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
@@ -106,9 +113,6 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ role, config, onBac
   const [formData, setFormData] = useState<RegistrationData>({
     firstName: '',
     lastName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
     phoneNumber: '',
     role: role,
     company: '',
@@ -122,34 +126,13 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ role, config, onBac
 
   const [errors, setErrors] = useState<Partial<RegistrationData>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [step, setStep] = useState(1);
+  const [isConnectingWallet, setIsConnectingWallet] = useState(false);
 
-  const validateStep1 = (): boolean => {
+  const validateForm = (): boolean => {
     const newErrors: Partial<RegistrationData> = {};
     
     if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
     if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Valid email is required';
-    }
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
-    }
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const validateStep2 = (): boolean => {
-    const newErrors: Partial<RegistrationData> = {};
-    
     if (!formData.company.trim()) newErrors.company = 'Company name is required';
     if (!formData.walletAddress.trim()) {
       newErrors.walletAddress = 'Wallet address is required';
@@ -170,20 +153,36 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ role, config, onBac
     }
   };
 
-  const handleNextStep = () => {
-    if (step === 1 && validateStep1()) {
-      setStep(2);
+  const connectWallet = async () => {
+    setIsConnectingWallet(true);
+    setErrors(prev => ({ ...prev, walletAddress: undefined }));
+    
+    try {
+      if (!window.ethereum) {
+        throw new Error('MetaMask is not installed');
+      }
+      
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const accounts = await provider.send("eth_requestAccounts", []);
+      
+      if (accounts.length > 0) {
+        setFormData(prev => ({ ...prev, walletAddress: accounts[0] }));
+      }
+    } catch (err) {
+      console.error('Wallet connection error:', err);
+      setErrors(prev => ({ 
+        ...prev, 
+        walletAddress: err instanceof Error ? err.message : 'Failed to connect wallet' 
+      }));
+    } finally {
+      setIsConnectingWallet(false);
     }
-  };
-
-  const handlePrevStep = () => {
-    setStep(1);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateStep2()) return;
+    if (!validateForm()) return;
     
     setIsSubmitting(true);
     
@@ -204,7 +203,7 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ role, config, onBac
       const result = await response.json();
       console.log('Registration successful:', result);
       
-      // Redirect to success page or login
+      // Redirect to login with success message
       window.location.href = '/login?registered=true';
       
     } catch (error) {
@@ -218,184 +217,94 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ role, config, onBac
   const IconComponent = config.icon;
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
+    <div className="max-w-3xl mx-auto p-6">
       {/* Header */}
       <div className="text-center mb-8">
         <button
           onClick={onBack}
-          className="inline-flex items-center text-indigo-600 hover:text-indigo-700 mb-4"
+          className="inline-flex items-center text-indigo-600 hover:text-indigo-700 mb-4 transition-colors font-medium"
         >
-          ← Back to role selection
+          <span className="mr-2">←</span> Back to role selection
         </button>
         
-        <div className={`${config.color} rounded-lg p-3 w-fit mx-auto mb-4`}>
-          <IconComponent className="w-8 h-8 text-white" />
+        <div className={`${config.color} rounded-2xl p-4 w-fit mx-auto mb-6 shadow-lg transform transition-transform hover:scale-110`}>
+          <IconComponent className="w-10 h-10 text-white" />
         </div>
         
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">
+        <h2 className="text-3xl font-bold text-gray-900 mb-3">
           {config.title}
         </h2>
         
-        <p className="text-gray-600">
+        <p className="text-lg text-gray-600 max-w-lg mx-auto">
           {config.description}
         </p>
       </div>
 
-      {/* Progress Indicator */}
-      <div className="flex items-center justify-center mb-8">
-        <div className="flex items-center">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            step >= 1 ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-500'
-          }`}>
-            1
-          </div>
-          <div className={`w-16 h-1 ${step >= 2 ? 'bg-indigo-600' : 'bg-gray-200'}`}></div>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-            step >= 2 ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-500'
-          }`}>
-            2
-          </div>
-        </div>
-      </div>
-
       {/* Form */}
-      <div className="bg-white rounded-xl shadow-lg p-8">
-        <form onSubmit={handleSubmit}>
-          {step === 1 && (
-            <div className="space-y-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Personal Information</h3>
-              
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    First Name *
-                  </label>
-                  <input
-                    type="text"
-                    name="firstName"
-                    value={formData.firstName}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                      errors.firstName ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="Enter your first name"
-                  />
-                  {errors.firstName && (
-                    <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Last Name *
-                  </label>
-                  <input
-                    type="text"
-                    name="lastName"
-                    value={formData.lastName}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                      errors.lastName ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="Enter your last name"
-                  />
-                  {errors.lastName && (
-                    <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>
-                  )}
-                </div>
-              </div>
-
+      <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+        <form onSubmit={handleSubmit} className="space-y-8">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 border-b pb-2 mb-6">Profile Information</h3>
+            <div className="grid md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email Address *
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  First Name *
                 </label>
                 <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
+                  type="text"
+                  name="firstName"
+                  value={formData.firstName}
                   onChange={handleInputChange}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                    errors.email ? 'border-red-500' : 'border-gray-300'
+                  className={`w-full px-4 py-3 border rounded-xl transition-all focus:ring-2 focus:ring-indigo-500 outline-none ${
+                    errors.firstName ? 'border-red-500 bg-red-50' : 'border-gray-300'
                   }`}
-                  placeholder="Enter your email address"
+                  placeholder="John"
                 />
-                {errors.email && (
-                  <p className="text-red-500 text-xs mt-1">{errors.email}</p>
+                {errors.firstName && (
+                  <p className="text-red-500 text-xs mt-2 font-medium">{errors.firstName}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Phone Number
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Last Name *
                 </label>
                 <input
-                  type="tel"
-                  name="phoneNumber"
-                  value={formData.phoneNumber}
+                  type="text"
+                  name="lastName"
+                  value={formData.lastName}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Enter your phone number"
+                  className={`w-full px-4 py-3 border rounded-xl transition-all focus:ring-2 focus:ring-indigo-500 outline-none ${
+                    errors.lastName ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                  }`}
+                  placeholder="Doe"
                 />
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Password *
-                  </label>
-                  <input
-                    type="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                      errors.password ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="Enter your password"
-                  />
-                  {errors.password && (
-                    <p className="text-red-500 text-xs mt-1">{errors.password}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Confirm Password *
-                  </label>
-                  <input
-                    type="password"
-                    name="confirmPassword"
-                    value={formData.confirmPassword}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                      errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="Confirm your password"
-                  />
-                  {errors.confirmPassword && (
-                    <p className="text-red-500 text-xs mt-1">{errors.confirmPassword}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleNextStep}
-                  className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors duration-200"
-                >
-                  Next Step →
-                </button>
+                {errors.lastName && (
+                  <p className="text-red-500 text-xs mt-2 font-medium">{errors.lastName}</p>
+                )}
               </div>
             </div>
-          )}
 
-          {step === 2 && (
+            <div className="mt-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Phone Number
+              </label>
+              <input
+                type="tel"
+                name="phoneNumber"
+                value={formData.phoneNumber}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl transition-all focus:ring-2 focus:ring-indigo-500 outline-none"
+                placeholder="+1 (555) 000-0000"
+              />
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 border-b pb-2 mb-6">Organizational Context</h3>
             <div className="space-y-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Business Information</h3>
-              
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Company Name *
                 </label>
                 <input
@@ -403,19 +312,19 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ role, config, onBac
                   name="company"
                   value={formData.company}
                   onChange={handleInputChange}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                    errors.company ? 'border-red-500' : 'border-gray-300'
+                  className={`w-full px-4 py-3 border rounded-xl transition-all focus:ring-2 focus:ring-indigo-500 outline-none ${
+                    errors.company ? 'border-red-500 bg-red-50' : 'border-gray-300'
                   }`}
-                  placeholder="Enter your company name"
+                  placeholder="Global Supply Co."
                 />
                 {errors.company && (
-                  <p className="text-red-500 text-xs mt-1">{errors.company}</p>
+                  <p className="text-red-500 text-xs mt-2 font-medium">{errors.company}</p>
                 )}
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Job Title
                   </label>
                   <input
@@ -423,13 +332,13 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ role, config, onBac
                     name="jobTitle"
                     value={formData.jobTitle}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Enter your job title"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl transition-all focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="Operations Manager"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Department
                   </label>
                   <input
@@ -437,14 +346,14 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ role, config, onBac
                     name="department"
                     value={formData.department}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Enter your department"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl transition-all focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="Logistics"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Business Address
                 </label>
                 <textarea
@@ -452,52 +361,76 @@ const RegistrationForm: React.FC<RegistrationFormProps> = ({ role, config, onBac
                   value={formData.address}
                   onChange={handleInputChange}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Enter your business address"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl transition-all focus:ring-2 focus:ring-indigo-500 outline-none"
+                  placeholder="123 Supply Chain Way, Tech City"
                 />
               </div>
+            </div>
+          </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Ethereum Wallet Address *
-                </label>
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 border-b pb-2 mb-6 text-indigo-600">Web3 Identity</h3>
+            <div className="space-y-4">
+              <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">
+                Ethereum Wallet Address *
+              </label>
+              
+              <div className="flex flex-col sm:flex-row gap-4">
                 <input
                   type="text"
                   name="walletAddress"
                   value={formData.walletAddress}
                   onChange={handleInputChange}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm ${
-                    errors.walletAddress ? 'border-red-500' : 'border-gray-300'
+                  className={`flex-grow px-4 py-3 border rounded-xl transition-all focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-sm ${
+                    errors.walletAddress ? 'border-red-500 bg-red-50' : 'border-gray-300'
                   }`}
                   placeholder="0x..."
                 />
-                {errors.walletAddress && (
-                  <p className="text-red-500 text-xs mt-1">{errors.walletAddress}</p>
-                )}
-                <p className="text-xs text-gray-500 mt-1">
-                  This wallet will be used for blockchain transactions and identity verification
-                </p>
-              </div>
-
-              <div className="flex justify-between">
                 <button
                   type="button"
-                  onClick={handlePrevStep}
-                  className="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400 transition-colors duration-200"
+                  onClick={connectWallet}
+                  disabled={isConnectingWallet}
+                  className="bg-indigo-50 text-indigo-700 px-6 py-3 rounded-xl font-bold border-2 border-indigo-200 hover:bg-indigo-100 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
                 >
-                  ← Previous
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? 'Creating Account...' : 'Create Account'}
+                  <Wallet className="w-5 h-5" />
+                  <span>{isConnectingWallet ? 'Connecting...' : 'Connect MetaMask'}</span>
                 </button>
               </div>
+              
+              {errors.walletAddress && (
+                <p className="text-red-500 text-xs mt-2 font-medium">{errors.walletAddress}</p>
+              )}
+              
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start space-x-3">
+                <div className="bg-blue-100 rounded-full p-1 mt-0.5">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <p className="text-xs text-blue-700 leading-relaxed">
+                  This wallet will be your permanent identity in the supply chain. Ensure you have access to this wallet as it cannot be changed after registration.
+                </p>
+              </div>
             </div>
-          )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full bg-indigo-600 text-white py-4 px-6 rounded-2xl hover:bg-indigo-700 transition-all duration-300 font-bold text-lg shadow-lg hover:shadow-indigo-500/20 active:scale-[0.99] disabled:opacity-50"
+          >
+            {isSubmitting ? (
+              <span className="flex items-center justify-center">
+                <svg className="animate-spin -ml-1 mr-3 h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing Registration...
+              </span>
+            ) : (
+              'Complete Registration'
+            )}
+          </button>
         </form>
       </div>
     </div>

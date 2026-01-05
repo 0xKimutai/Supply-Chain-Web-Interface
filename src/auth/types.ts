@@ -13,9 +13,6 @@ export interface RegistrationData {
   // Personal Information
   firstName: string;
   lastName: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
   phoneNumber?: string;
   
   // Role and Company Information
