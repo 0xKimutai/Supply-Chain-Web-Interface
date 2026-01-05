@@ -1,69 +1,63 @@
-# React + TypeScript + Vite
+# Supply Chain Tracking System - Web Interface
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This repository contains the web-based user interface for the Supply Chain Tracking System. It serves as the primary interaction layer for manufacturers, distributors, retailers, and customers to engage with a blockchain-backed ledger of product lifecycles.
 
-Currently, two official plugins are available:
+## Project Overview
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+The Supply Chain Tracking System is designed to solve the problem of transparency and trust in global logistics. By combining the immutability of blockchain with the scalability of a modern Java backend, this system ensures that every product journey—from raw material to the final consumer—is verifiable and tamper-proof.
 
-## Expanding the ESLint configuration
+## The Role of the Web Interface
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+This frontend interface acts as the window into the complex "engine" running behind the scenes. It provides specialized dashboards for different industry roles:
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+*   **Manufacturers**: Can register new products on the blockchain, creating a unique digital twin (NFT-like identity) that stores metadata such as origin and production date.
+*   **Distributors & Logistics Partners**: Can update the status of goods in transit (e.g., "Dispatched", "Received at Warehouse"), which triggers immutable state changes on the Ethereum network.
+*   **Retailers**: Can scan and verify inventory authenticity before final sale, ensuring that counterfeit goods do not enter the storefront.
+*   **Customers**: Can access a public-facing portal to view the complete history of their purchased product, providing confidence in its quality and source.
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+## The Backend Engine (Java & Blockchain)
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+While this repository hosts the interface, its functionality is powered by a robust backend architecture. For visitors to understand the full scope of the project, here is an overview of the core engine:
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 1. Blockchain Layer (Solidity)
+The "Truth Layer" of the project. It consists of smart contracts deployed on an Ethereum-compatible network.
+*   **Immutable Ledger**: Once a transfer or status update is recorded, it cannot be altered by any party.
+*   **Smart Contracts**: Handle the logic of ownership transfers and ensure that only authorized stakeholders can update specific product states.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### 2. Enterprise Logic Layer (Spring Boot 3.x)
+The bridge between the user interface and the blockchain.
+*   **Web3j Integration**: The backend uses Web3j to communicate with smart contracts, abstracting the complexity of blockchain transactions for the frontend.
+*   **RESTful APIs**: Provides high-performance endpoints for the frontend to query product status, user profiles, and analytics.
+*   **Security & Identity**: Implements enterprise-grade authentication (JWT) and integrates with blockchain wallet signatures for secure login.
+*   **Metadata Management**: While the blockchain stores the history, a PostgreSQL database is used to store high-bandwidth metadata like product images and detailed descriptions that would be too expensive to store on-chain.
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### 3. Event-Driven Architecture
+The system utilizes a listener pattern where the Java backend monitors the blockchain for events. When a transaction is confirmed on-chain, the backend automatically updates the off-chain database and can trigger notifications (email/SMS) to relevant stakeholders.
+
+## Technical Configuration
+
+*   **Frontend**: React 19, TypeScript, Tailwind CSS 4.
+*   **Wallet Integration**: Uses Ethers.js v6 to interact with MetaMask and other Ethereum providers.
+*   **Vite Proxy**: Configured to route API requests seamlessly to the backend service at `http://localhost:8080`.
+
+## Installation and Development
+
+To run this interface locally:
+
+1.  **Clone the Repository**:
+    ```bash
+    git clone https://github.com/0xKimutai/Supply-Chain-Web-Interface.git
+    cd Supply-Chain-Web-Interface
+    ```
+2.  **Install Dependencies**:
+    ```bash
+    npm install
+    ```
+3.  **Start Development Server**:
+    ```bash
+    npm run dev
+    ```
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
